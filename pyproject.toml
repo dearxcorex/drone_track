@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-drone-detector = "drone_detector:main"
+drone-detector = "drone_detector.cli:app"
 
 [build-system]
 requires = ["hatchling"]
