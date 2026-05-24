@@ -20,6 +20,8 @@ class ChannelHopper(threading.Thread):
         channels: list[int],
         dwell_ms: int,
         set_channel_fn: SetChannelFn,
+        reset_on_stall: int = 0,
+        reset_fn: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(name=f"hopper-{iface}", daemon=True)
         if not channels:
@@ -31,9 +33,18 @@ class ChannelHopper(threading.Thread):
         self._dwell_s = dwell_ms / 1000.0
         self._set_channel = set_channel_fn
         self._stop_event = threading.Event()
+        self._reset_on_stall = reset_on_stall
+        self._reset_fn = reset_fn
+        self._empty_hops = 0
+        # Set when a packet is seen; cleared each hop so consecutive-empty counting is accurate.
+        self._packet_seen = threading.Event()
 
     def stop(self) -> None:
         self._stop_event.set()
+
+    def notify_packet_seen(self) -> None:
+        """Called by external consumers when a frame decodes; resets the stall counter."""
+        self._packet_seen.set()
 
     def run(self) -> None:
         i = 0
@@ -41,6 +52,21 @@ class ChannelHopper(threading.Thread):
             ch = self._channels[i % len(self._channels)]
             try:
                 self._set_channel(self._iface, ch)
+                if self._packet_seen.is_set():
+                    self._empty_hops = 0
+                    self._packet_seen.clear()
+                else:
+                    self._empty_hops += 1
+                if (
+                    self._reset_on_stall
+                    and self._empty_hops >= self._reset_on_stall
+                    and self._reset_fn
+                ):
+                    try:
+                        self._reset_fn(self._iface)
+                    except Exception:
+                        log.warning("reset_fn failed for %s", self._iface, exc_info=True)
+                    self._empty_hops = 0
             except Exception:
                 log.warning("set_channel %s -> %d failed", self._iface, ch, exc_info=True)
             i += 1

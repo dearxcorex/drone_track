@@ -51,3 +51,40 @@ def test_hopper_swallows_set_channel_errors():
     assert h.is_alive()   # did not crash on the exception
     h.stop()
     h.join(timeout=1.0)
+
+
+def test_hopper_reset_after_n_consecutive_empty_hops():
+    resets: list[str] = []
+    h = ChannelHopper(
+        iface="wlan1",
+        channels=[1, 6],
+        dwell_ms=10,
+        set_channel_fn=lambda i, c: None,
+        reset_on_stall=2,
+        reset_fn=lambda iface: resets.append(iface),
+    )
+    h.start()
+    time.sleep(0.06)   # ~6 hops, no notifications => should trigger ~3 resets
+    h.stop()
+    h.join(timeout=1.0)
+    assert len(resets) >= 1
+    assert resets[0] == "wlan1"
+
+
+def test_hopper_reset_not_triggered_when_notified():
+    resets: list[str] = []
+    h = ChannelHopper(
+        iface="wlan1",
+        channels=[1, 6],
+        dwell_ms=10,
+        set_channel_fn=lambda i, c: None,
+        reset_on_stall=2,
+        reset_fn=lambda iface: resets.append(iface),
+    )
+    h.start()
+    for _ in range(6):
+        h.notify_packet_seen()   # external signal that frames are arriving
+        time.sleep(0.01)
+    h.stop()
+    h.join(timeout=1.0)
+    assert resets == []

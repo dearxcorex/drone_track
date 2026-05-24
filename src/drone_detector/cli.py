@@ -11,7 +11,8 @@ import typer
 from rich.console import Console
 
 from drone_detector.capture.hopper import ChannelHopper
-from drone_detector.capture.iw_backend import set_channel
+from drone_detector.capture.iw_backend import link_down_up, set_channel
+from drone_detector.models import DroneReport
 from drone_detector.pipeline import run_pipeline
 from drone_detector.sinks.base import ReportSink
 from drone_detector.sinks.jsonl_sink import JsonlFileSink
@@ -54,6 +55,26 @@ def replay(
             s.close()
 
 
+class _HopperNotifySink:
+    """Sink wrapper: forwards report to inner sinks AND tells the hopper a frame arrived."""
+
+    def __init__(self, inner: list[ReportSink], hopper: ChannelHopper) -> None:
+        self._inner = inner
+        self._hopper = hopper
+
+    def write(self, report: DroneReport) -> None:
+        self._hopper.notify_packet_seen()
+        for s in self._inner:
+            try:
+                s.write(report)
+            except Exception:
+                pass  # pipeline already isolates sink errors; mirror that here
+
+    def close(self) -> None:
+        for s in self._inner:
+            s.close()
+
+
 @app.command()
 def listen(
     iface: str = typer.Option(..., "--iface", help="Monitor-mode WiFi interface (Linux)"),  # noqa: B008
@@ -72,7 +93,6 @@ def listen(
     ),
 ) -> None:
     """Live-capture WiFi RemoteID beacons from a monitor-mode interface."""
-    _ = reset_on_stall  # reserved for Task 13 (driver-wedge mitigation)
     sinks = _build_sinks(out)
     source = LivePcapSource(iface=iface)
     hopper: ChannelHopper | None = None
@@ -83,8 +103,11 @@ def listen(
             channels=ch_list,
             dwell_ms=dwell_ms,
             set_channel_fn=set_channel,
+            reset_on_stall=reset_on_stall,
+            reset_fn=link_down_up if reset_on_stall > 0 else None,
         )
         hopper.start()
+        sinks = [_HopperNotifySink(sinks, hopper)]
     try:
         run_pipeline(source=source, sinks=sinks)
     finally:
