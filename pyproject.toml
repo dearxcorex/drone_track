@@ -1,6 +1,6 @@
 [project]
 name = "drone-detector"
-version = "0.1.0"
+version = "0.2.0"
 description = "DJI DroneID decoder for NBTC Thailand. Decodes DJI's WiFi beacon vendor IE into drone GPS, pilot GPS, serial, and flight session UUID."
 readme = "README.md"
 authors = [
@@ -27,6 +27,12 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.14",
 ]
+
+[tool.hatch.build.hooks.custom]
+path = "build_libopendroneid.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/drone_detector"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
