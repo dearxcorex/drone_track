@@ -1,4 +1,4 @@
-"""Parse the payload of a DJI DroneID v2 vendor IE into a DroneIDReport.
+"""Parse the payload of a DJI DroneID v2 vendor IE into a DroneReport.
 
 Byte layout is documented in docs/dji_droneid_v2_format.md (the single source of truth).
 All multi-byte fields are little-endian.
@@ -7,7 +7,7 @@ All multi-byte fields are little-endian.
 import struct
 from datetime import datetime
 
-from drone_detector.models import DroneIDReport
+from drone_detector.models import DroneReport
 
 LAT_LON_SCALE = 1e7
 ALT_SCALE = 10.0
@@ -34,8 +34,8 @@ def parse_dji_droneid(
     captured_at: datetime,
     rssi: int | None,
     raw_frame_hex: str,
-) -> DroneIDReport:
-    """Decode a DJI DroneID v2 IE payload (without OUI/OUI-type) into a DroneIDReport."""
+) -> DroneReport:
+    """Decode a DJI DroneID v2 IE payload (without OUI/OUI-type) into a DroneReport."""
     if len(payload) < HEADER_LEN + SERIAL_LEN_BYTE:
         raise MalformedDroneIDError("payload shorter than header+serial-length")
 
@@ -73,9 +73,12 @@ def parse_dji_droneid(
         home_lat_i / LAT_LON_SCALE, home_lon_i / LAT_LON_SCALE
     )
 
-    return DroneIDReport(
+    return DroneReport(
         captured_at=captured_at,
         rssi=rssi,
+        protocol="dji_v2",
+        operator_id=None,
+        astm_message_type=None,
         drone_serial=serial,
         drone_lat=drone_lat_i / LAT_LON_SCALE,
         drone_lon=drone_lon_i / LAT_LON_SCALE,

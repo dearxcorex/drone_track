@@ -7,10 +7,10 @@ from typing import IO
 
 from rich.console import Console
 
-from drone_detector.models import DroneIDReport
+from drone_detector.models import DroneReport
 
 
-def _bucket(report: DroneIDReport, window_s: int) -> int:
+def _bucket(report: DroneReport, window_s: int) -> int:
     return int(report.captured_at.timestamp()) // window_s
 
 
@@ -26,7 +26,7 @@ class StdoutSink:
         self._dedup_window_s = dedup_window_s
         self._seen: dict[tuple[str, int], None] = {}
 
-    def write(self, report: DroneIDReport) -> None:
+    def write(self, report: DroneReport) -> None:
         if self._dedup_window_s > 0:
             key = (report.drone_serial, _bucket(report, self._dedup_window_s))
             if key in self._seen:
@@ -39,10 +39,14 @@ class StdoutSink:
             else "pilot=unknown"
         )
         rssi = f"{report.rssi}dBm" if report.rssi is not None else "rssi=?"
+        if report.drone_lat is not None and report.drone_lon is not None:
+            drone_pos = f"drone=({report.drone_lat:.5f},{report.drone_lon:.5f})"
+        else:
+            drone_pos = "drone=(--,--)"
         self._console.print(
             f"[cyan]{ts}[/cyan]  "
             f"[bold]{report.drone_serial}[/bold]  "
-            f"drone=({report.drone_lat:.5f},{report.drone_lon:.5f}) "
+            f"{drone_pos} "
             f"{pilot}  RSSI={rssi}"
         )
 

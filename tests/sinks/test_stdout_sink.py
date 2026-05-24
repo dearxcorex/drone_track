@@ -3,13 +3,16 @@ from datetime import UTC, datetime
 
 from rich.console import Console
 
-from drone_detector.models import DroneIDReport
+from drone_detector.models import DroneReport
 from drone_detector.sinks.stdout_sink import StdoutSink
 
 
-def _make_report(serial: str, when: datetime) -> DroneIDReport:
-    return DroneIDReport(
+def _make_report(serial: str, when: datetime) -> DroneReport:
+    return DroneReport(
         captured_at=when, rssi=-65, drone_serial=serial,
+        protocol="dji_v2",
+        operator_id=None,
+        astm_message_type=None,
         drone_lat=13.7563, drone_lon=100.5018,
         drone_altitude_m=120.0, drone_height_m=45.5,
         drone_speed_ns_mps=1.2, drone_speed_ew_mps=-0.4, drone_speed_ud_mps=0.0,

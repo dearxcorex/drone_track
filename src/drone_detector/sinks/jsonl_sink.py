@@ -7,10 +7,10 @@ import json
 from pathlib import Path
 from typing import IO
 
-from drone_detector.models import DroneIDReport
+from drone_detector.models import DroneReport
 
 
-def _bucket(report: DroneIDReport, window_s: int) -> int:
+def _bucket(report: DroneReport, window_s: int) -> int:
     if window_s <= 0:
         return -1
     return int(report.captured_at.timestamp()) // window_s
@@ -29,7 +29,7 @@ class JsonlFileSink:
             self._fh = self._path.open("a", encoding="utf-8")
         return self._fh
 
-    def write(self, report: DroneIDReport) -> None:
+    def write(self, report: DroneReport) -> None:
         if self._dedup_window_s > 0:
             key = (report.drone_serial, _bucket(report, self._dedup_window_s))
             if key in self._seen:

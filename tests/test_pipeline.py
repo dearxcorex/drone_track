@@ -1,16 +1,16 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from drone_detector.models import DroneIDReport
+from drone_detector.models import DroneReport
 from drone_detector.pipeline import run_pipeline
 from drone_detector.sources.file_pcap import FilePcapSource
 
 
 class RecordingSink:
     def __init__(self) -> None:
-        self.reports: list[DroneIDReport] = []
+        self.reports: list[DroneReport] = []
 
-    def write(self, report: DroneIDReport) -> None:
+    def write(self, report: DroneReport) -> None:
         self.reports.append(report)
 
     def close(self) -> None:

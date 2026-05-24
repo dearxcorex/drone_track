@@ -1,14 +1,17 @@
 import json
 from datetime import UTC, datetime
 
-from drone_detector.models import DroneIDReport
+from drone_detector.models import DroneReport
 from drone_detector.sinks.jsonl_sink import JsonlFileSink
 
 
-def _make_report(serial: str = "X", when: datetime | None = None) -> DroneIDReport:
-    return DroneIDReport(
+def _make_report(serial: str = "X", when: datetime | None = None) -> DroneReport:
+    return DroneReport(
         captured_at=when or datetime(2026, 5, 23, 10, 0, 0, tzinfo=UTC),
         rssi=-70, drone_serial=serial,
+        protocol="dji_v2",
+        operator_id=None,
+        astm_message_type=None,
         drone_lat=13.0, drone_lon=100.0,
         drone_altitude_m=10.0, drone_height_m=5.0,
         drone_speed_ns_mps=0.0, drone_speed_ew_mps=0.0, drone_speed_ud_mps=0.0,
