@@ -10,3 +10,5 @@ detections.jsonl
 *.pcap
 !tests/fixtures/pcaps/*.pcap
 .worktrees/
+src/drone_detector/_lib/libopendroneid.dylib
+src/drone_detector/_lib/libopendroneid.so*
