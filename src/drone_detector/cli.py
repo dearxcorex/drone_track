@@ -10,6 +10,8 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from drone_detector.capture.hopper import ChannelHopper
+from drone_detector.capture.iw_backend import set_channel
 from drone_detector.pipeline import run_pipeline
 from drone_detector.sinks.base import ReportSink
 from drone_detector.sinks.jsonl_sink import JsonlFileSink
@@ -56,13 +58,39 @@ def replay(
 def listen(
     iface: str = typer.Option(..., "--iface", help="Monitor-mode WiFi interface (Linux)"),  # noqa: B008
     out: Path | None = typer.Option(Path("detections.jsonl"), "--out"),  # noqa: B008
+    hop: bool = typer.Option(True, "--hop/--no-hop", help="Cycle channels while listening"),  # noqa: B008
+    channels: str = typer.Option(
+        "1,6,11,36,40,44,149,153,157,161",
+        "--channels",
+        help="Comma-separated channel list",
+    ),  # noqa: B008
+    dwell_ms: int = typer.Option(200, "--dwell-ms"),  # noqa: B008
+    reset_on_stall: int = typer.Option(  # noqa: B008
+        20,
+        "--reset-on-stall",
+        help="ip link down/up after N consecutive empty hops; 0 to disable",
+    ),
 ) -> None:
-    """Live-capture DJI DroneID beacons from a monitor-mode interface."""
+    """Live-capture WiFi RemoteID beacons from a monitor-mode interface."""
+    _ = reset_on_stall  # reserved for Task 13 (driver-wedge mitigation)
     sinks = _build_sinks(out)
     source = LivePcapSource(iface=iface)
+    hopper: ChannelHopper | None = None
+    if hop:
+        ch_list = [int(c.strip()) for c in channels.split(",") if c.strip()]
+        hopper = ChannelHopper(
+            iface=iface,
+            channels=ch_list,
+            dwell_ms=dwell_ms,
+            set_channel_fn=set_channel,
+        )
+        hopper.start()
     try:
         run_pipeline(source=source, sinks=sinks)
     finally:
+        if hopper is not None:
+            hopper.stop()
+            hopper.join(timeout=1.0)
         source.close()
         for s in sinks:
             s.close()
