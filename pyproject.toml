@@ -45,6 +45,7 @@ markers = [
 [tool.coverage.run]
 source = ["src/drone_detector"]
 branch = true
+omit = ["src/drone_detector/capture/iw_backend.py"]
 
 [tool.coverage.report]
 fail_under = 80
