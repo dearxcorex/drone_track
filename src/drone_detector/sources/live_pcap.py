@@ -1,10 +1,17 @@
-"""Live monitor-mode sniffer using scapy's AsyncSniffer (Linux only)."""
+"""Live monitor-mode sniffer using scapy's AsyncSniffer (Linux only).
+
+Uses libpcap (PACKET_MMAP) instead of the default AF_PACKET socket so the
+sniffer survives transient ENETDOWN events that the kernel raises during
+`iw set channel` calls. Without this, channel hopping kills scapy's
+receive thread after the first hop.
+"""
 
 from __future__ import annotations
 
 import queue
 from collections.abc import Iterator
 
+from scapy.config import conf
 from scapy.sendrecv import AsyncSniffer
 
 
@@ -19,6 +26,7 @@ class LivePcapSource:
     def start(self) -> None:
         if self._sniffer is not None:
             return
+        conf.use_pcap = True
         self._sniffer = AsyncSniffer(
             iface=self._iface,
             store=False,
