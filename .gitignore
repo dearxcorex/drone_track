@@ -9,3 +9,4 @@ htmlcov/
 detections.jsonl
 *.pcap
 !tests/fixtures/pcaps/*.pcap
+.worktrees/
