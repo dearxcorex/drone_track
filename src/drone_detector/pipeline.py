@@ -8,10 +8,9 @@ from datetime import UTC, datetime
 
 from scapy.layers.dot11 import Dot11Beacon
 
-from drone_detector.decoder.dji_droneid_v2 import (
-    MalformedDroneIDError,
-    parse_dji_droneid,
-)
+from drone_detector.decoder import registry
+from drone_detector.decoder.astm_f3411 import MalformedAstmError
+from drone_detector.decoder.dji_droneid_v2 import MalformedDroneIDError
 from drone_detector.decoder.ie_extract import extract_drone_ie
 from drone_detector.decoder.radiotap import parse_radiotap
 from drone_detector.sinks.base import ReportSink
@@ -40,18 +39,18 @@ def run_pipeline(
             if match is None:
                 continue
             tag, ie_payload = match
-            if tag != "dji_v2":
-                continue   # ASTM dispatch added by registry task
             meta = parse_radiotap(packet)
-            report = parse_dji_droneid(
-                ie_payload,
-                captured_at=clock(),
-                rssi=meta.rssi,
-                raw_frame_hex=bytes(packet).hex(),
-            )
-        except MalformedDroneIDError as exc:
-            log.debug("dropping malformed DroneID: %s", exc)
-            continue
+            try:
+                report = registry.parse(
+                    tag,
+                    ie_payload,
+                    captured_at=clock(),
+                    rssi=meta.rssi,
+                    raw_frame_hex=bytes(packet).hex(),
+                )
+            except (MalformedDroneIDError, MalformedAstmError, NotImplementedError) as exc:
+                log.debug("dropping malformed/unsupported %s frame: %s", tag, exc)
+                continue
         except Exception:
             log.debug("skipping packet due to unexpected error", exc_info=True)
             continue
