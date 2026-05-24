@@ -21,7 +21,7 @@ class JsonlFileSink:
         self._path = Path(path)
         self._fh: IO[str] | None = None
         self._dedup_window_s = dedup_window_s
-        self._seen: dict[tuple[str | None, int], None] = {}
+        self._seen: dict[tuple[str, int], None] = {}
 
     def _open(self) -> IO[str]:
         if self._fh is None:
@@ -31,7 +31,10 @@ class JsonlFileSink:
 
     def write(self, report: DroneReport) -> None:
         if self._dedup_window_s > 0:
-            key = (report.drone_serial, _bucket(report, self._dedup_window_s))
+            key = (
+                report.drone_serial or report.raw_frame_hex[:24],
+                _bucket(report, self._dedup_window_s),
+            )
             if key in self._seen:
                 return
             self._seen[key] = None

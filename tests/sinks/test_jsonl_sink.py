@@ -22,6 +22,25 @@ def _make_report(serial: str = "X", when: datetime | None = None) -> DroneReport
     )
 
 
+def _make_astm_location_report(raw_frame_hex: str, when: datetime | None = None) -> DroneReport:
+    """Simulate an ASTM Location message: drone_serial is None."""
+    return DroneReport(
+        captured_at=when or datetime(2026, 5, 23, 10, 0, 0, tzinfo=UTC),
+        rssi=-70,
+        drone_serial=None,
+        protocol="astm_f3411",
+        operator_id=None,
+        astm_message_type=0,
+        drone_lat=13.0, drone_lon=100.0,
+        drone_altitude_m=10.0, drone_height_m=5.0,
+        drone_speed_ns_mps=0.0, drone_speed_ew_mps=0.0, drone_speed_ud_mps=0.0,
+        drone_yaw_deg=0.0,
+        pilot_lat=None, pilot_lon=None, home_lat=None, home_lon=None,
+        uuid_len=None, uuid=None,
+        raw_frame_hex=raw_frame_hex,
+    )
+
+
 def test_writes_one_json_object_per_line(tmp_path) -> None:
     path = tmp_path / "out.jsonl"
     sink = JsonlFileSink(path, dedup_window_s=0)
@@ -46,3 +65,16 @@ def test_dedups_same_serial_within_window(tmp_path) -> None:
     sink.close()
     lines = path.read_text().splitlines()
     assert len(lines) == 2
+
+
+def test_astm_location_distinct_frames_both_emitted(tmp_path) -> None:
+    """Two ASTM Location reports (serial=None) with different raw frames must BOTH appear."""
+    path = tmp_path / "out.jsonl"
+    sink = JsonlFileSink(path, dedup_window_s=5)
+    base = datetime(2026, 5, 23, 10, 0, 0, tzinfo=UTC)
+    # Different raw_frame_hex -> different dedup keys even though both have drone_serial=None
+    sink.write(_make_astm_location_report("aabbccddeeff001122334455667788", when=base))
+    sink.write(_make_astm_location_report("bbccddeeff00112233445566778899", when=base))
+    sink.close()
+    lines = path.read_text().splitlines()
+    assert len(lines) == 2, "distinct ASTM Location frames must not be collapsed by dedup"
