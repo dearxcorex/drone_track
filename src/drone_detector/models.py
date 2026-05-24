@@ -10,7 +10,7 @@ class DroneReport:
     protocol: Literal["dji_v2", "astm_f3411"]
     raw_frame_hex: str
 
-    drone_serial: str
+    drone_serial: str | None
     operator_id: str | None
 
     drone_lat: float | None

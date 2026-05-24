@@ -24,7 +24,7 @@ class StdoutSink:
     ) -> None:
         self._console = console or Console(file=file or sys.stdout)
         self._dedup_window_s = dedup_window_s
-        self._seen: dict[tuple[str, int], None] = {}
+        self._seen: dict[tuple[str | None, int], None] = {}
 
     def write(self, report: DroneReport) -> None:
         if self._dedup_window_s > 0:

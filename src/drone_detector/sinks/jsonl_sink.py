@@ -21,7 +21,7 @@ class JsonlFileSink:
         self._path = Path(path)
         self._fh: IO[str] | None = None
         self._dedup_window_s = dedup_window_s
-        self._seen: dict[tuple[str, int], None] = {}
+        self._seen: dict[tuple[str | None, int], None] = {}
 
     def _open(self) -> IO[str]:
         if self._fh is None:

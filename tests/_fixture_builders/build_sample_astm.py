@@ -1,7 +1,7 @@
-"""Builds ASTM F3411 Basic ID fixture using libopendroneid's own encoder.
+"""Builds ASTM F3411 Basic ID and Location fixtures using libopendroneid's own encoder.
 
-Using encodeBasicIDMessage guarantees the fixture bytes exactly match what
-decodeBasicIDMessage expects — no manual byte-layout guessing required.
+Using encode*Message guarantees the fixture bytes exactly match what
+decode*Message expects — no manual byte-layout guessing required.
 """
 
 from __future__ import annotations
@@ -39,6 +39,37 @@ class _ODID_BasicID_encoded(ctypes.Structure):
     ]
 
 
+# ODID_Location_data field order verified against opendroneid.h lines 295-312.
+# All enum fields use c_int (C enums are int-sized).
+class _ODID_Location_data(ctypes.Structure):
+    _fields_ = [
+        ("Status", ctypes.c_int),           # ODID_status_t (enum -> int)
+        ("Direction", ctypes.c_float),
+        ("SpeedHorizontal", ctypes.c_float),
+        ("SpeedVertical", ctypes.c_float),
+        ("Latitude", ctypes.c_double),
+        ("Longitude", ctypes.c_double),
+        ("AltitudeBaro", ctypes.c_float),
+        ("AltitudeGeo", ctypes.c_float),
+        ("HeightType", ctypes.c_int),       # ODID_Height_reference_t (enum -> int)
+        ("Height", ctypes.c_float),
+        ("HorizAccuracy", ctypes.c_int),    # ODID_Horizontal_accuracy_t (enum -> int)
+        ("VertAccuracy", ctypes.c_int),     # ODID_Vertical_accuracy_t (enum -> int)
+        ("BaroAccuracy", ctypes.c_int),     # ODID_Vertical_accuracy_t (enum -> int)
+        ("SpeedAccuracy", ctypes.c_int),    # ODID_Speed_accuracy_t (enum -> int)
+        ("TSAccuracy", ctypes.c_int),       # ODID_Timestamp_accuracy_t (enum -> int)
+        ("TimeStamp", ctypes.c_float),
+    ]
+
+
+# ODID_Location_encoded (packed): 25 bytes total
+class _ODID_Location_encoded(ctypes.Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("raw", ctypes.c_uint8 * 25),
+    ]
+
+
 def build_basic_id() -> bytes:
     lib = _resolve_lib()
 
@@ -64,13 +95,53 @@ def build_basic_id() -> bytes:
     return raw
 
 
+def build_location() -> bytes:
+    lib = _resolve_lib()
+
+    encode_fn = lib.encodeLocationMessage
+    encode_fn.restype = ctypes.c_int
+    encode_fn.argtypes = [
+        ctypes.POINTER(_ODID_Location_encoded),
+        ctypes.POINTER(_ODID_Location_data),
+    ]
+
+    in_data = _ODID_Location_data()
+    in_data.Status = 2              # ODID_STATUS_AIRBORNE
+    in_data.Direction = 90.0        # degrees (East)
+    in_data.SpeedHorizontal = 5.0   # m/s
+    in_data.SpeedVertical = 0.5     # m/s
+    in_data.Latitude = 13.7
+    in_data.Longitude = 100.5
+    in_data.AltitudeBaro = 50.0     # metres
+    in_data.AltitudeGeo = 55.0      # metres
+    in_data.HeightType = 0          # ODID_HEIGHT_REF_OVER_TAKEOFF
+    in_data.Height = 30.0           # metres
+    in_data.HorizAccuracy = 5       # some enum value
+    in_data.VertAccuracy = 3
+    in_data.BaroAccuracy = 3
+    in_data.SpeedAccuracy = 2
+    in_data.TSAccuracy = 1
+    in_data.TimeStamp = 120.5       # seconds after full hour
+
+    encoded = _ODID_Location_encoded()
+    rc = encode_fn(ctypes.byref(encoded), ctypes.byref(in_data))
+    if rc != 0:
+        raise RuntimeError(f"encodeLocationMessage returned {rc}")
+
+    raw = bytes(encoded)
+    assert len(raw) == 25, f"Expected 25 bytes, got {len(raw)}"
+    return raw
+
+
 def main() -> None:
-    out = Path("tests/fixtures/beacons/sample_astm_basic_id.bin")
-    data = build_basic_id()
-    out.write_bytes(data)
-    print(f"wrote {out} ({out.stat().st_size}B)")
-    # Show hex for debugging
-    print(f"hex: {data.hex()}")
+    out_dir = Path("tests/fixtures/beacons")
+    basic_id_data = build_basic_id()
+    (out_dir / "sample_astm_basic_id.bin").write_bytes(basic_id_data)
+    print(f"wrote sample_astm_basic_id.bin ({len(basic_id_data)}B): {basic_id_data.hex()}")
+
+    location_data = build_location()
+    (out_dir / "sample_astm_location.bin").write_bytes(location_data)
+    print(f"wrote sample_astm_location.bin ({len(location_data)}B): {location_data.hex()}")
 
 
 if __name__ == "__main__":

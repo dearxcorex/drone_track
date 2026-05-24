@@ -41,6 +41,47 @@ class _ODID_BasicID_data(ctypes.Structure):
     ]
 
 
+# Mirror ODID_Location_data from opendroneid.h lines 295-312.
+# All enum fields use c_int (C enums are int-sized).
+# struct ODID_Location_data {
+#     ODID_status_t Status;               -- enum -> int
+#     float Direction;
+#     float SpeedHorizontal;
+#     float SpeedVertical;
+#     double Latitude;
+#     double Longitude;
+#     float AltitudeBaro;
+#     float AltitudeGeo;
+#     ODID_Height_reference_t HeightType; -- enum -> int
+#     float Height;
+#     ODID_Horizontal_accuracy_t HorizAccuracy; -- enum -> int
+#     ODID_Vertical_accuracy_t VertAccuracy;    -- enum -> int
+#     ODID_Vertical_accuracy_t BaroAccuracy;    -- enum -> int
+#     ODID_Speed_accuracy_t SpeedAccuracy;      -- enum -> int
+#     ODID_Timestamp_accuracy_t TSAccuracy;     -- enum -> int
+#     float TimeStamp;
+# }
+class _ODID_Location_data(ctypes.Structure):
+    _fields_ = [
+        ("Status", ctypes.c_int),
+        ("Direction", ctypes.c_float),
+        ("SpeedHorizontal", ctypes.c_float),
+        ("SpeedVertical", ctypes.c_float),
+        ("Latitude", ctypes.c_double),
+        ("Longitude", ctypes.c_double),
+        ("AltitudeBaro", ctypes.c_float),
+        ("AltitudeGeo", ctypes.c_float),
+        ("HeightType", ctypes.c_int),
+        ("Height", ctypes.c_float),
+        ("HorizAccuracy", ctypes.c_int),
+        ("VertAccuracy", ctypes.c_int),
+        ("BaroAccuracy", ctypes.c_int),
+        ("SpeedAccuracy", ctypes.c_int),
+        ("TSAccuracy", ctypes.c_int),
+        ("TimeStamp", ctypes.c_float),
+    ]
+
+
 # ODID_BasicID_encoded is __packed__ at 25 bytes.
 # We pass the raw payload buffer directly — the C library reads it as-is.
 _decodeBasicIDMessage = _LIB.decodeBasicIDMessage
@@ -50,8 +91,20 @@ _decodeBasicIDMessage.argtypes = [
     ctypes.POINTER(ctypes.c_uint8 * 25),
 ]
 
+# ODID_Location_encoded is __packed__ at 25 bytes.
+_decodeLocationMessage = _LIB.decodeLocationMessage
+_decodeLocationMessage.restype = ctypes.c_int
+_decodeLocationMessage.argtypes = [
+    ctypes.POINTER(_ODID_Location_data),
+    ctypes.POINTER(ctypes.c_uint8 * 25),
+]
+
 ASTM_MIN_FRAME_BYTES = 25
 ODID_SUCCESS = 0
+
+# ASTM/libopendroneid sentinel values
+_ALTITUDE_INVALID = -1000.0
+_DIRECTION_INVALID = 361.0
 
 
 def _message_type(payload: bytes) -> int:
@@ -64,6 +117,20 @@ def _message_type(payload: bytes) -> int:
     return (payload[0] >> 4) & 0x0F
 
 
+def _none_if_zero_pair(
+    lat: float, lon: float
+) -> tuple[float | None, float | None]:
+    """Return (None, None) when both lat and lon are 0.0 (ASTM/DJI 'not acquired')."""
+    if lat == 0.0 and lon == 0.0:
+        return None, None
+    return lat, lon
+
+
+def _none_if_sentinel(value: float, sentinel: float) -> float | None:
+    """Return None when value equals the ASTM sentinel."""
+    return None if value == sentinel else value
+
+
 def parse_astm(
     payload: bytes,
     *,
@@ -73,7 +140,7 @@ def parse_astm(
 ) -> DroneReport:
     """Decode an ASTM F3411 wire frame and return a unified DroneReport.
 
-    Currently handles MessageType 0 (Basic ID) only.
+    Handles MessageType 0 (Basic ID) and MessageType 1 (Location).
     Raises MalformedAstmError for short payloads, unknown message types, or
     non-zero return codes from the C decoder.
     """
@@ -106,6 +173,39 @@ def parse_astm(
             drone_speed_ew_mps=None,
             drone_speed_ud_mps=None,
             drone_yaw_deg=None,
+            pilot_lat=None,
+            pilot_lon=None,
+            home_lat=None,
+            home_lon=None,
+            astm_message_type=mtype,
+            uuid_len=None,
+            uuid=None,
+        )
+
+    if mtype == 1:  # ODID_MESSAGETYPE_LOCATION
+        decoded_loc = _ODID_Location_data()
+        rc = _decodeLocationMessage(ctypes.byref(decoded_loc), ctypes.byref(buf))
+        if rc != ODID_SUCCESS:
+            raise MalformedAstmError(f"decodeLocationMessage rc={rc}")
+        lat, lon = _none_if_zero_pair(decoded_loc.Latitude, decoded_loc.Longitude)
+        altitude_m = _none_if_sentinel(decoded_loc.AltitudeGeo, _ALTITUDE_INVALID)
+        height_m = _none_if_sentinel(decoded_loc.Height, _ALTITUDE_INVALID)
+        yaw_deg = _none_if_sentinel(decoded_loc.Direction, _DIRECTION_INVALID)
+        return DroneReport(
+            captured_at=captured_at,
+            rssi=rssi,
+            protocol="astm_f3411",
+            raw_frame_hex=raw_frame_hex,
+            drone_serial=None,
+            operator_id=None,
+            drone_lat=lat,
+            drone_lon=lon,
+            drone_altitude_m=altitude_m,
+            drone_height_m=height_m,
+            drone_speed_ns_mps=None,
+            drone_speed_ew_mps=None,
+            drone_speed_ud_mps=decoded_loc.SpeedVertical,
+            drone_yaw_deg=yaw_deg,
             pilot_lat=None,
             pilot_lon=None,
             home_lat=None,

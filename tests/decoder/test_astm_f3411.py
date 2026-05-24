@@ -29,3 +29,16 @@ def test_parse_rejects_short_payload():
             rssi=None,
             raw_frame_hex="",
         )
+
+
+def test_parse_location_returns_lat_lon():
+    payload = (FIXTURES / "sample_astm_location.bin").read_bytes()
+    r = parse_astm(
+        payload,
+        captured_at=datetime(2026, 5, 24, 12, 0, tzinfo=UTC),
+        rssi=-60,
+        raw_frame_hex="",
+    )
+    assert r.astm_message_type == 1
+    assert r.drone_lat == pytest.approx(13.7, rel=1e-5)
+    assert r.drone_lon == pytest.approx(100.5, rel=1e-5)
