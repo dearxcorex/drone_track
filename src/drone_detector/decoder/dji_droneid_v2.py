@@ -60,11 +60,15 @@ def parse_dji_droneid(
     pilot_lat_i, pilot_lon_i, home_lat_i, home_lon_i = struct.unpack_from("<iiii", payload, cursor)
     cursor += 16
 
-    uuid_len = payload[cursor]
+    uuid_len_raw = payload[cursor]
     cursor += 1
-    if cursor + uuid_len > len(payload):
+    if cursor + uuid_len_raw > len(payload):
         raise MalformedDroneIDError("uuid extends past payload")
-    uuid_hex = payload[cursor : cursor + uuid_len].hex()
+    uuid_hex = payload[cursor : cursor + uuid_len_raw].hex()
+
+    # Normalize absent UUID to None/None (consistent with ASTM parser convention)
+    uuid_len: int | None = uuid_len_raw if uuid_len_raw > 0 else None
+    uuid: str | None = uuid_hex if uuid_len_raw > 0 else None
 
     pilot_lat, pilot_lon = _none_if_zero_pair(
         pilot_lat_i / LAT_LON_SCALE, pilot_lon_i / LAT_LON_SCALE
@@ -93,6 +97,6 @@ def parse_dji_droneid(
         home_lat=home_lat,
         home_lon=home_lon,
         uuid_len=uuid_len,
-        uuid=uuid_hex,
+        uuid=uuid,
         raw_frame_hex=raw_frame_hex,
     )
