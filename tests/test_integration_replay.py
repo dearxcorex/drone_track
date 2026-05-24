@@ -24,3 +24,22 @@ def test_replay_matches_golden(tmp_path: Path, fixtures_dir: Path) -> None:
     expected_path = fixtures_dir / "golden" / "two_beacons.expected.jsonl"
     expected = [json.loads(line) for line in expected_path.read_text().splitlines()]
     assert actual == expected
+
+
+def test_replay_mixed_protocols_matches_golden(tmp_path: Path, fixtures_dir: Path) -> None:
+    pcap = fixtures_dir / "pcaps" / "mixed_protocols.pcap"
+    out = tmp_path / "out.jsonl"
+
+    sink = JsonlFileSink(out, dedup_window_s=0)
+    with FilePcapSource(pcap) as source:
+        run_pipeline(
+            source=source,
+            sinks=[sink],
+            clock=lambda: datetime(2026, 5, 24, 10, 0, 0, tzinfo=UTC),
+        )
+    sink.close()
+
+    actual = [json.loads(line) for line in out.read_text().splitlines()]
+    expected_path = fixtures_dir / "golden" / "mixed_protocols.expected.jsonl"
+    expected = [json.loads(line) for line in expected_path.read_text().splitlines()]
+    assert actual == expected
