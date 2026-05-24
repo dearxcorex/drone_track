@@ -12,7 +12,7 @@ from drone_detector.decoder.dji_droneid_v2 import (
     MalformedDroneIDError,
     parse_dji_droneid,
 )
-from drone_detector.decoder.ie_extract import extract_dji_ie
+from drone_detector.decoder.ie_extract import extract_drone_ie
 from drone_detector.decoder.radiotap import parse_radiotap
 from drone_detector.sinks.base import ReportSink
 from drone_detector.sources.base import FrameSource
@@ -36,9 +36,12 @@ def run_pipeline(
             if not packet.haslayer(Dot11Beacon):
                 continue
             frame_body = bytes(packet[Dot11Beacon].payload)
-            ie_payload = extract_dji_ie(frame_body)
-            if ie_payload is None:
+            match = extract_drone_ie(frame_body)
+            if match is None:
                 continue
+            tag, ie_payload = match
+            if tag != "dji_v2":
+                continue   # ASTM dispatch added by registry task
             meta = parse_radiotap(packet)
             report = parse_dji_droneid(
                 ie_payload,
