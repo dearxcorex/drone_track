@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import logging
 import subprocess
 import time
 from pathlib import Path
@@ -19,6 +20,8 @@ from drone_detector.sinks.jsonl_sink import JsonlFileSink
 from drone_detector.sinks.stdout_sink import StdoutSink
 from drone_detector.sources.file_pcap import FilePcapSource
 from drone_detector.sources.live_pcap import LivePcapSource
+
+log = logging.getLogger(__name__)
 
 app = typer.Typer(add_completion=False, help="DJI DroneID decoder for NBTC Thailand.")
 
@@ -68,7 +71,7 @@ class _HopperNotifySink:
             try:
                 s.write(report)
             except Exception:
-                pass  # pipeline already isolates sink errors; mirror that here
+                log.exception("sink %r failed; continuing", s)
 
     def close(self) -> None:
         for s in self._inner:
