@@ -98,6 +98,10 @@ def listen(
     """Live-capture WiFi RemoteID beacons from a monitor-mode interface."""
     sinks = _build_sinks(out)
     source = LivePcapSource(iface=iface)
+    # Bind the AF_PACKET socket before the hopper starts changing channels.
+    # Otherwise iw's transient ENETDOWN can hit scapy's bind and kill the sniffer.
+    source.start()
+    time.sleep(0.5)
     hopper: ChannelHopper | None = None
     if hop:
         ch_list = [int(c.strip()) for c in channels.split(",") if c.strip()]
