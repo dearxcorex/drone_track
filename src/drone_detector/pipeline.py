@@ -48,7 +48,7 @@ def run_pipeline(
                     rssi=meta.rssi,
                     raw_frame_hex=bytes(packet).hex(),
                 )
-            except (MalformedDroneIDError, MalformedAstmError, NotImplementedError) as exc:
+            except (MalformedDroneIDError, MalformedAstmError) as exc:
                 log.debug("dropping malformed/unsupported %s frame: %s", tag, exc)
                 continue
         except Exception:
